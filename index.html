@@ -207,6 +207,22 @@
       border-bottom: 1px solid var(--glass-border);
       cursor: pointer;
     }
+
+    .progress-bar-bg {
+      width: 100%;
+      height: 12px;
+      background: rgba(0,0,0,0.4);
+      border-radius: 6px;
+      overflow: hidden;
+      margin-top: 8px;
+      border: 1px solid var(--glass-border);
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--gradient-accent);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
   </style>
 </head>
 <body>
@@ -220,6 +236,20 @@
       <div id="todayWorkoutDisplay">
         <p style="text-align: center; color: var(--muted);">No workout scheduled for today.</p>
       </div>
+    </div>
+
+    <!-- WEIGHT CHECK-IN CARD ON HOME PAGE -->
+    <div class="card">
+      <h2>Weight Check-In</h2>
+      <div style="display: flex; gap: 8px; align-items: flex-end;">
+        <div style="flex: 1;">
+          <label style="margin-top:0;">Current Weight</label>
+          <input type="number" id="quickWeightInput" step="0.1" placeholder="e.g. 68.5">
+        </div>
+        <button style="width: auto; margin-top:0; padding: 12px 18px;" onclick="quickLogWeight()">Log</button>
+      </div>
+      <p id="latestWeightDisplay" style="color:var(--muted); font-size:0.85rem; margin-top:10px; margin-bottom:0; text-align:center;">No weight logged yet.</p>
+      <button class="secondary-btn" style="margin-top:12px;" onclick="switchTab('weight-history')">View Weight History & Goals →</button>
     </div>
 
     <div class="card">
@@ -236,6 +266,37 @@
     <div class="card">
       <h2>Routines</h2>
       <button onclick="switchTab('creator')">Manage Routines</button>
+    </div>
+  </div>
+
+  <!-- WEIGHT HISTORY & GOAL PAGE -->
+  <div id="tab-weight-history" class="tab-content">
+    <button class="secondary-btn" style="margin-bottom:15px; width:auto; padding:8px 16px;" onclick="switchTab('home')">← Back to Home</button>
+    <h1>WEIGHT TRACKER</h1>
+    
+    <div class="card">
+      <h2>Target Weight Goal</h2>
+      <div style="display: flex; gap: 8px; align-items: flex-end;">
+        <div style="flex: 1;">
+          <label style="margin-top:0;">Goal Weight (kg/lbs)</label>
+          <input type="number" id="goalWeightInput" step="0.1" placeholder="e.g. 65.0">
+        </div>
+        <button style="width: auto; margin-top:0; padding: 12px 18px;" onclick="saveGoalWeight()">Set Goal</button>
+      </div>
+      <div id="goalProgressContainer" style="margin-top:15px; display:none;">
+        <div style="display:flex; justify-content:space-between; font-size:0.85rem;">
+          <span id="goalProgressText" style="color:var(--muted);">Progress</span>
+          <span id="goalTargetText" style="font-weight:bold; color:var(--accent-pink);">Goal: --</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="goalProgressBar"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Weight History</h2>
+      <ul id="weightHistoryList"></ul>
     </div>
   </div>
 
@@ -399,7 +460,7 @@
 
   <script>
     let db, draftExercises = [], currentActiveRoutineId = null;
-    const dbReq = indexedDB.open("WorkoutTrackerDB", 5);
+    const dbReq = indexedDB.open("WorkoutTrackerDB", 6);
 
     dbReq.onupgradeneeded = (e) => {
       db = e.target.result;
@@ -407,6 +468,7 @@
       if (!db.objectStoreNames.contains("routines")) db.createObjectStore("routines", { keyPath: "id", autoIncrement: true });
       if (!db.objectStoreNames.contains("schedule")) db.createObjectStore("schedule", { keyPath: "id", autoIncrement: true });
       if (!db.objectStoreNames.contains("activity")) db.createObjectStore("activity", { keyPath: "id", autoIncrement: true });
+      if (!db.objectStoreNames.contains("weight_logs")) db.createObjectStore("weight_logs", { keyPath: "id", autoIncrement: true });
     };
 
     dbReq.onsuccess = (e) => {
@@ -427,7 +489,81 @@
     }
 
     function refreshAllData() {
-      renderHomePBs(); renderTodayWorkout(); renderPBs(); renderRoutines(); renderSchedule(); renderActivityLog();
+      renderHomePBs(); renderTodayWorkout(); renderPBs(); renderRoutines(); renderSchedule(); renderActivityLog(); renderWeightTracker();
+    }
+
+    /* WEIGHT TRACKING LOGIC */
+    function quickLogWeight() {
+      const val = parseFloat(document.getElementById("quickWeightInput").value);
+      if (isNaN(val) || val <= 0) return alert("Please enter a valid weight.");
+
+      const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const tx = db.transaction("weight_logs", "readwrite");
+      tx.objectStore("weight_logs").add({ weight: val, date: dateStr });
+      tx.oncomplete = () => {
+        document.getElementById("quickWeightInput").value = "";
+        refreshAllData();
+        alert("Weight logged!");
+      };
+    }
+
+    function saveGoalWeight() {
+      const val = parseFloat(document.getElementById("goalWeightInput").value);
+      if (isNaN(val) || val <= 0) return alert("Please enter a valid goal weight.");
+      localStorage.setItem("user_goal_weight", val);
+      refreshAllData();
+      alert("Goal weight saved!");
+    }
+
+    function renderWeightTracker() {
+      const tx = db.transaction("weight_logs", "readonly");
+      tx.objectStore("weight_logs").getAll().onsuccess = (e) => {
+        const logs = e.target.result.reverse();
+        const displayHome = document.getElementById("latestWeightDisplay");
+        const listHistory = document.getElementById("weightHistoryList");
+
+        if (logs.length > 0) {
+          const latest = logs[0];
+          displayHome.innerText = `Latest: ${latest.weight} kg/lbs (${latest.date})`;
+        } else {
+          displayHome.innerText = "No weight logged yet.";
+        }
+
+        listHistory.innerHTML = logs.map(w => `
+          <li>
+            <span><strong>${w.weight} kg/lbs</strong> <small style="color:var(--muted)">(${w.date})</small></span>
+            <button class="del-btn" onclick="deleteWeightLog(${w.id})">Delete</button>
+          </li>
+        `).join('') || "<p style='color:var(--muted); text-align:center;'>No weight entries logged yet.</p>";
+
+        // Goal Progress calculation
+        const goalVal = parseFloat(localStorage.getItem("user_goal_weight"));
+        const goalContainer = document.getElementById("goalProgressContainer");
+        if (!isNaN(goalVal) && logs.length > 0) {
+          goalContainer.style.display = "block";
+          document.getElementById("goalWeightInput").value = goalVal;
+          document.getElementById("goalTargetText").innerText = `Goal: ${goalVal} kg/lbs`;
+          
+          const currentVal = logs[0].weight;
+          const initialVal = logs[logs.length - 1].weight;
+          
+          let progressPercent = 100;
+          if (initialVal !== goalVal) {
+            progressPercent = Math.min(100, Math.max(0, ((initialVal - currentVal) / (initialVal - goalVal)) * 100));
+          }
+          
+          document.getElementById("goalProgressBar").style.width = `${progressPercent}%`;
+          document.getElementById("goalProgressText").innerText = `Current: ${currentVal} kg/lbs`;
+        } else if (!isNaN(goalVal)) {
+          document.getElementById("goalWeightInput").value = goalVal;
+        }
+      };
+    }
+
+    function deleteWeightLog(id) {
+      const tx = db.transaction("weight_logs", "readwrite");
+      tx.objectStore("weight_logs").delete(id);
+      tx.oncomplete = () => refreshAllData();
     }
 
     /* ROUTINES & EXERCISE DRAFT */
@@ -563,15 +699,13 @@
           }
         });
 
-        // Save to Activity Log
         tx.objectStore("activity").add({
           routineName: rt.name,
-          completedCount: completedExercises.length,
+          exercises: completedExercises,
           totalCount: (rt.items || []).length,
           date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute:'2-digit' })
         });
 
-        // Clear local checkboxes
         const keys = Object.keys(localStorage);
         keys.forEach(k => {
           if (k.startsWith(`rt_${currentActiveRoutineId}_ex_`)) {
@@ -587,21 +721,40 @@
       };
     }
 
+    /* EXPANDABLE ACTIVITY LOG LIST */
     function renderActivityLog() {
       const tx = db.transaction("activity", "readonly");
       tx.objectStore("activity").getAll().onsuccess = (e) => {
         const logs = e.target.result.reverse();
         const list = document.getElementById("activityList");
-        list.innerHTML = logs.map(a => `
-          <li>
-            <div>
-              <strong style="color:var(--accent-pink);">${a.routineName}</strong><br>
-              <small style="color:var(--muted)">${a.date} • ${a.completedCount}/${a.totalCount} exercises finished</small>
-            </div>
-            <button class="del-btn" onclick="deleteActivityLog(${a.id})">Delete</button>
-          </li>
-        `).join('') || "<p style='color:var(--muted); text-align:center;'>No completed workouts logged yet.</p>";
+        
+        list.innerHTML = logs.map(a => {
+          const exListHTML = (a.exercises && a.exercises.length) 
+            ? a.exercises.map(ex => `<div style="padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color:#fff; font-size:0.85rem;">✓ ${ex}</div>`).join('')
+            : '<div style="color:var(--muted); font-size:0.85rem;">No exercises checked off.</div>';
+
+          return `
+            <li style="flex-direction: column; align-items: stretch; padding: 12px 0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleActivityDetails('act-${a.id}')">
+                <div>
+                  <strong style="color:var(--accent-pink); font-size:1rem;">${a.routineName} ▼</strong><br>
+                  <small style="color:var(--muted)">${a.date} • ${(a.exercises || []).length}/${a.totalCount} completed</small>
+                </div>
+                <button class="del-btn" onclick="event.stopPropagation(); deleteActivityLog(${a.id})">Delete</button>
+              </div>
+              <div id="act-${a.id}" style="display: none; margin-top: 10px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 10px;">
+                <strong style="font-size:0.8rem; color:var(--accent-orange); text-transform:uppercase; display:block; margin-bottom:6px;">Completed Exercises:</strong>
+                ${exListHTML}
+              </div>
+            </li>
+          `;
+        }).join('') || "<p style='color:var(--muted); text-align:center;'>No completed workouts logged yet.</p>";
       };
+    }
+
+    function toggleActivityDetails(id) {
+      const el = document.getElementById(id);
+      if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
     }
 
     function deleteActivityLog(id) {
