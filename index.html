@@ -125,11 +125,11 @@
     }
     .nav-btn {
       background: none; border: none; color: var(--muted);
-      font-size: 0.7rem; display: flex; flex-direction: column;
+      font-size: 0.65rem; display: flex; flex-direction: column;
       align-items: center; gap: 3px; padding: 0; margin: 0; width: auto;
     }
     .nav-btn.active { color: #fff; font-weight: bold; }
-    .nav-icon { font-size: 1.2rem; }
+    .nav-icon { font-size: 1.1rem; }
 
     .timer-display { font-size: 3.5rem; font-weight: 800; text-align: center; margin: 15px 0; color: #fff; }
     .timer-btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -224,7 +224,7 @@
 
     <div class="card">
       <div class="filter-bar">
-        <h2 style="margin:0;">Recent PBs</h2>
+        <h2 style="margin:0;">Personal Bests (PBs)</h2>
         <select id="pbSortHome" style="width: auto; padding: 4px 8px; margin: 0; font-size: 0.8rem;" onchange="renderHomePBs()">
           <option value="recent">Most Recent</option>
           <option value="az">A to Z</option>
@@ -287,7 +287,7 @@
         <button class="del-btn" id="detailDeleteRoutineBtn">Delete Routine</button>
       </div>
       <div id="detailExerciseList"></div>
-      <button class="success-btn" style="margin-top:15px;" onclick="finishActiveWorkout()">Finish Workout</button>
+      <button class="success-btn" style="margin-top:15px;" onclick="finishActiveWorkout()">Complete Workout</button>
     </div>
 
     <div class="card">
@@ -346,11 +346,11 @@
     </div>
   </div>
 
-  <!-- LOG TAB -->
+  <!-- LOG / PBS TAB -->
   <div id="tab-log" class="tab-content">
-    <h1>LOG WORKOUT</h1>
+    <h1>PERSONAL BESTS</h1>
     <div class="card">
-      <h2>Record PB / Set</h2>
+      <h2>Record / Update PB</h2>
       <label>Exercise Name</label>
       <input type="text" id="logExName" placeholder="e.g. Hip Thrust">
       <div style="display: flex; gap: 10px;">
@@ -363,18 +363,27 @@
           <input type="number" id="logReps" placeholder="10">
         </div>
       </div>
-      <button onclick="saveSet()">Save Entry</button>
+      <button onclick="savePB()">Save PB</button>
     </div>
 
     <div class="card">
       <div class="filter-bar">
-        <h2 style="margin:0;">History & PBs</h2>
-        <select id="pbSortLog" style="width: auto; padding: 4px 8px; margin: 0; font-size: 0.8rem;" onchange="renderHistory()">
+        <h2 style="margin:0;">Personal Bests</h2>
+        <select id="pbSortLog" style="width: auto; padding: 4px 8px; margin: 0; font-size: 0.8rem;" onchange="renderPBs()">
           <option value="recent">Most Recent</option>
           <option value="az">A to Z</option>
         </select>
       </div>
-      <ul id="historyList"></ul>
+      <ul id="pbList"></ul>
+    </div>
+  </div>
+
+  <!-- ACTIVITY LOG TAB -->
+  <div id="tab-activity" class="tab-content">
+    <h1>ACTIVITY LOG</h1>
+    <div class="card">
+      <h2>Completed Workouts</h2>
+      <ul id="activityList"></ul>
     </div>
   </div>
 
@@ -384,18 +393,20 @@
     <button class="nav-btn" onclick="switchTab('creator')"><span class="nav-icon">💪</span><span>Routines</span></button>
     <button class="nav-btn" onclick="switchTab('calendar')"><span class="nav-icon">📅</span><span>Calendar</span></button>
     <button class="nav-btn" onclick="switchTab('timer')"><span class="nav-icon">⏱️</span><span>Timer</span></button>
-    <button class="nav-btn" onclick="switchTab('log')"><span class="nav-icon">📝</span><span>Log</span></button>
+    <button class="nav-btn" onclick="switchTab('log')"><span class="nav-icon">🏆</span><span>PBs</span></button>
+    <button class="nav-btn" onclick="switchTab('activity')"><span class="nav-icon">📝</span><span>Activity</span></button>
   </nav>
 
   <script>
     let db, draftExercises = [], currentActiveRoutineId = null;
-    const dbReq = indexedDB.open("WorkoutTrackerDB", 4);
+    const dbReq = indexedDB.open("WorkoutTrackerDB", 5);
 
     dbReq.onupgradeneeded = (e) => {
       db = e.target.result;
-      if (!db.objectStoreNames.contains("logs")) db.createObjectStore("logs", { keyPath: "id", autoIncrement: true });
+      if (!db.objectStoreNames.contains("pbs")) db.createObjectStore("pbs", { keyPath: "name" });
       if (!db.objectStoreNames.contains("routines")) db.createObjectStore("routines", { keyPath: "id", autoIncrement: true });
       if (!db.objectStoreNames.contains("schedule")) db.createObjectStore("schedule", { keyPath: "id", autoIncrement: true });
+      if (!db.objectStoreNames.contains("activity")) db.createObjectStore("activity", { keyPath: "id", autoIncrement: true });
     };
 
     dbReq.onsuccess = (e) => {
@@ -411,12 +422,12 @@
       const target = document.getElementById(`tab-${tabId}`);
       if (target) target.classList.add('active');
 
-      const idx = ['home', 'creator', 'calendar', 'timer', 'log'].indexOf(tabId);
+      const idx = ['home', 'creator', 'calendar', 'timer', 'log', 'activity'].indexOf(tabId);
       if (idx !== -1) document.querySelectorAll('.nav-btn')[idx].classList.add('active');
     }
 
     function refreshAllData() {
-      renderHomePBs(); renderTodayWorkout(); renderHistory(); renderRoutines(); renderSchedule();
+      renderHomePBs(); renderTodayWorkout(); renderPBs(); renderRoutines(); renderSchedule(); renderActivityLog();
     }
 
     /* ROUTINES & EXERCISE DRAFT */
@@ -440,7 +451,6 @@
       const name = document.getElementById("routineName").value.trim();
       const directExName = document.getElementById("exTitle").value.trim();
 
-      // If user typed an exercise directly in the inputs without clicking "+ Add Exercise to Draft"
       if (directExName) {
         draftExercises.push({
           name: directExName,
@@ -494,7 +504,7 @@
       };
     }
 
-    /* ROUTINE DETAIL PAGE WITH SORTING & CHECKBOX PERSISTENCE */
+    /* ROUTINE DETAIL PAGE & WORKOUT COMPLETION */
     function openRoutineDetailPage(id) {
       currentActiveRoutineId = id;
       const tx = db.transaction("routines", "readonly");
@@ -540,14 +550,64 @@
 
     function finishActiveWorkout() {
       if (!currentActiveRoutineId) return;
-      const keys = Object.keys(localStorage);
-      keys.forEach(k => {
-        if (k.startsWith(`rt_${currentActiveRoutineId}_ex_`)) {
-          localStorage.removeItem(k);
-        }
-      });
-      alert("Workout completed and progress reset!");
-      openRoutineDetailPage(currentActiveRoutineId);
+
+      const tx = db.transaction(["routines", "activity"], "readwrite");
+      tx.objectStore("routines").get(currentActiveRoutineId).onsuccess = (e) => {
+        const rt = e.target.result;
+        if (!rt) return;
+
+        const completedExercises = [];
+        (rt.items || []).forEach((ex, idx) => {
+          if (localStorage.getItem(`rt_${currentActiveRoutineId}_ex_${idx}`) === 'true') {
+            completedExercises.push(ex.name);
+          }
+        });
+
+        // Save to Activity Log
+        tx.objectStore("activity").add({
+          routineName: rt.name,
+          completedCount: completedExercises.length,
+          totalCount: (rt.items || []).length,
+          date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute:'2-digit' })
+        });
+
+        // Clear local checkboxes
+        const keys = Object.keys(localStorage);
+        keys.forEach(k => {
+          if (k.startsWith(`rt_${currentActiveRoutineId}_ex_`)) {
+            localStorage.removeItem(k);
+          }
+        });
+      };
+
+      tx.oncomplete = () => {
+        alert("Workout Complete! Recorded in your Activity Log.");
+        refreshAllData();
+        switchTab('activity');
+      };
+    }
+
+    function renderActivityLog() {
+      const tx = db.transaction("activity", "readonly");
+      tx.objectStore("activity").getAll().onsuccess = (e) => {
+        const logs = e.target.result.reverse();
+        const list = document.getElementById("activityList");
+        list.innerHTML = logs.map(a => `
+          <li>
+            <div>
+              <strong style="color:var(--accent-pink);">${a.routineName}</strong><br>
+              <small style="color:var(--muted)">${a.date} • ${a.completedCount}/${a.totalCount} exercises finished</small>
+            </div>
+            <button class="del-btn" onclick="deleteActivityLog(${a.id})">Delete</button>
+          </li>
+        `).join('') || "<p style='color:var(--muted); text-align:center;'>No completed workouts logged yet.</p>";
+      };
+    }
+
+    function deleteActivityLog(id) {
+      const tx = db.transaction("activity", "readwrite");
+      tx.objectStore("activity").delete(id);
+      tx.oncomplete = () => refreshAllData();
     }
 
     function moveExercise(rtId, idx, direction) {
@@ -567,14 +627,13 @@
     }
 
     function showHistoryPopup(exName) {
-      const tx = db.transaction("logs", "readonly");
-      tx.objectStore("logs").getAll().onsuccess = (e) => {
-        const logs = e.target.result.filter(l => l.name.toLowerCase() === exName.toLowerCase()).reverse();
-        if (logs.length) {
-          const top = logs[0];
-          alert(`Last Logged for ${exName}:\nWeight: ${top.weight} kg/lbs\nReps: ${top.reps}\nDate: ${top.date}`);
+      const tx = db.transaction("pbs", "readonly");
+      tx.objectStore("pbs").get(exName).onsuccess = (e) => {
+        const pb = e.target.result;
+        if (pb) {
+          alert(`Current PB for ${exName}:\nWeight: ${pb.weight} kg/lbs\nReps: ${pb.reps}\nDate: ${pb.date}`);
         } else {
-          alert(`No previous history logged for "${exName}".`);
+          alert(`No PB recorded for "${exName}".`);
         }
       };
     }
@@ -687,76 +746,84 @@
       };
     }
 
-    /* LOGS & PBS (WITH SAVING FIX & A-Z SORTING) */
-    function saveSet() {
-      const name = document.getElementById("logExName").value.trim();
+    /* PB AUTO-REPLACEMENT LOGIC */
+    function savePB() {
+      const nameInput = document.getElementById("logExName").value.trim();
       const weightVal = document.getElementById("logWeight").value;
       const repsVal = document.getElementById("logReps").value;
 
-      const weight = weightVal !== "" ? parseFloat(weightVal) : 0;
-      const reps = repsVal !== "" ? parseInt(repsVal) : 0;
+      if (!nameInput) return alert("Please enter an Exercise Name.");
+      if (weightVal === "") return alert("Please enter a Weight.");
 
-      if (!name) return alert("Please enter an Exercise Name.");
+      const newWeight = parseFloat(weightVal);
+      const newReps = repsVal !== "" ? parseInt(repsVal) : 0;
+      const dateStr = new Date().toLocaleDateString();
 
-      const tx = db.transaction("logs", "readwrite");
-      tx.objectStore("logs").add({ 
-        name, 
-        weight, 
-        reps, 
-        date: new Date().toLocaleDateString() 
-      });
-      
-      tx.oncomplete = () => { 
-        document.getElementById("logExName").value = ""; 
-        document.getElementById("logWeight").value = ""; 
-        document.getElementById("logReps").value = ""; 
-        refreshAllData(); 
-        alert("PB / Set Logged!");
+      const tx = db.transaction("pbs", "readwrite");
+      const store = tx.objectStore("pbs");
+
+      store.get(nameInput).onsuccess = (e) => {
+        const existingPB = e.target.result;
+
+        if (existingPB) {
+          if (newWeight > existingPB.weight) {
+            store.put({ name: nameInput, weight: newWeight, reps: newReps, date: dateStr });
+            alert(`🎉 New PB for ${nameInput}! Updated to ${newWeight} kg/lbs.`);
+          } else {
+            alert(`Stored PB is higher (${existingPB.weight} kg/lbs). PB was not replaced.`);
+          }
+        } else {
+          store.put({ name: nameInput, weight: newWeight, reps: newReps, date: dateStr });
+          alert(`PB Saved for ${nameInput}!`);
+        }
+      };
+
+      tx.oncomplete = () => {
+        document.getElementById("logExName").value = "";
+        document.getElementById("logWeight").value = "";
+        document.getElementById("logReps").value = "";
+        refreshAllData();
       };
     }
 
-    function renderHistory() {
+    function renderPBs() {
       const sortMode = document.getElementById("pbSortLog") ? document.getElementById("pbSortLog").value : 'recent';
-      const tx = db.transaction("logs", "readonly");
-      tx.objectStore("logs").getAll().onsuccess = (e) => {
-        let logs = e.target.result;
+      const tx = db.transaction("pbs", "readonly");
+      tx.objectStore("pbs").getAll().onsuccess = (e) => {
+        let pbs = e.target.result;
         if (sortMode === 'az') {
-          logs.sort((a, b) => a.name.localeCompare(b.name));
-        } else {
-          logs.reverse();
+          pbs.sort((a, b) => a.name.localeCompare(b.name));
         }
-        document.getElementById("historyList").innerHTML = logs.map(i => `
+        document.getElementById("pbList").innerHTML = pbs.map(i => `
           <li>
-            <span><strong>${i.name}</strong> (${i.date}): ${i.weight} kg/lbs x ${i.reps} reps</span>
-            <button class="del-btn" onclick="deleteLogEntry(${i.id})">Delete</button>
+            <span><strong>${i.name}</strong>: ${i.weight} kg/lbs x ${i.reps} reps <small style="color:var(--muted)">(${i.date})</small></span>
+            <button class="del-btn" onclick="deletePB('${i.name}')">Delete</button>
           </li>
-        `).join('') || "<p style='color:var(--muted);'>No entries logged yet.</p>";
+        `).join('') || "<p style='color:var(--muted); text-align:center;'>No PBs logged yet.</p>";
       };
     }
 
     function renderHomePBs() {
       const sortMode = document.getElementById("pbSortHome") ? document.getElementById("pbSortHome").value : 'recent';
-      const tx = db.transaction("logs", "readonly");
-      tx.objectStore("logs").getAll().onsuccess = (e) => {
-        const pbs = {};
-        e.target.result.forEach(i => { if (!pbs[i.name] || i.weight > pbs[i.name].weight) pbs[i.name] = i; });
-        let pbList = Object.values(pbs);
+      const tx = db.transaction("pbs", "readonly");
+      tx.objectStore("pbs").getAll().onsuccess = (e) => {
+        let pbs = e.target.result;
         if (sortMode === 'az') {
-          pbList.sort((a, b) => a.name.localeCompare(b.name));
+          pbs.sort((a, b) => a.name.localeCompare(b.name));
         }
         const list = document.getElementById("homePbList");
-        list.innerHTML = pbList.slice(0, 5).map(pb => `
+        list.innerHTML = pbs.slice(0, 5).map(pb => `
           <li>
             <span><strong>${pb.name}</strong> - ${pb.weight} kg/lbs</span>
-            <button class="del-btn" onclick="deleteLogEntry(${pb.id})">Delete</button>
+            <button class="del-btn" onclick="deletePB('${pb.name}')">Delete</button>
           </li>
-        `).join('') || "<p style='color:var(--muted);'>No PBs recorded yet.</p>";
+        `).join('') || "<p style='color:var(--muted); text-align:center;'>No PBs recorded yet.</p>";
       };
     }
 
-    function deleteLogEntry(id) {
-      const tx = db.transaction("logs", "readwrite");
-      tx.objectStore("logs").delete(id);
+    function deletePB(name) {
+      const tx = db.transaction("pbs", "readwrite");
+      tx.objectStore("pbs").delete(name);
       tx.oncomplete = () => refreshAllData();
     }
 
