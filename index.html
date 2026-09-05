@@ -192,6 +192,13 @@
       width: auto;
     }
 
+    .filter-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
     .routine-card-item {
       display: flex;
       justify-content: space-between;
@@ -204,6 +211,7 @@
 </head>
 <body>
 
+  <!-- HOME TAB -->
   <div id="tab-home" class="tab-content active">
     <h1>WORKOUT TRACKER</h1>
     <div class="card">
@@ -215,7 +223,13 @@
     </div>
 
     <div class="card">
-      <h2>Recent PBs</h2>
+      <div class="filter-bar">
+        <h2 style="margin:0;">Recent PBs</h2>
+        <select id="pbSortHome" style="width: auto; padding: 4px 8px; margin: 0; font-size: 0.8rem;" onchange="renderHomePBs()">
+          <option value="recent">Most Recent</option>
+          <option value="az">A to Z</option>
+        </select>
+      </div>
       <ul id="homePbList"></ul>
     </div>
 
@@ -225,6 +239,7 @@
     </div>
   </div>
 
+  <!-- ROUTINES TAB -->
   <div id="tab-creator" class="tab-content">
     <h1>ROUTINES</h1>
     <div class="card">
@@ -250,7 +265,7 @@
       <label>Equipment</label>
       <input type="text" id="exEquip" placeholder="Barbell">
 
-      <button onclick="addExerciseToDraft()">+ Add Exercise</button>
+      <button onclick="addExerciseToDraft()">+ Add Exercise to Draft</button>
       <div id="draftExerciseList" style="margin-top: 15px;"></div>
       <button class="secondary-btn" onclick="saveFullRoutine()">Save Routine</button>
     </div>
@@ -261,6 +276,7 @@
     </div>
   </div>
 
+  <!-- ROUTINE DETAIL PAGE -->
   <div id="tab-routine-detail" class="tab-content">
     <button class="secondary-btn" style="margin-bottom:15px; width:auto; padding:8px 16px;" onclick="switchTab('creator')">← Back to Routines</button>
     <h1 id="detailRoutineTitle">ROUTINE</h1>
@@ -297,6 +313,7 @@
     </div>
   </div>
 
+  <!-- CALENDAR TAB -->
   <div id="tab-calendar" class="tab-content">
     <h1>SCHEDULE</h1>
     <div class="card">
@@ -314,6 +331,7 @@
     </div>
   </div>
 
+  <!-- TIMER TAB -->
   <div id="tab-timer" class="tab-content">
     <h1>REST TIMER</h1>
     <div class="card">
@@ -328,15 +346,16 @@
     </div>
   </div>
 
+  <!-- LOG TAB -->
   <div id="tab-log" class="tab-content">
     <h1>LOG WORKOUT</h1>
     <div class="card">
-      <h2>Record Set</h2>
-      <label>Exercise</label>
-      <input type="text" id="logExName" placeholder="Hip Thrust">
+      <h2>Record PB / Set</h2>
+      <label>Exercise Name</label>
+      <input type="text" id="logExName" placeholder="e.g. Hip Thrust">
       <div style="display: flex; gap: 10px;">
         <div style="flex: 1;">
-          <label>Weight</label>
+          <label>Weight (kg/lbs)</label>
           <input type="number" id="logWeight" placeholder="80">
         </div>
         <div style="flex: 1;">
@@ -344,15 +363,22 @@
           <input type="number" id="logReps" placeholder="10">
         </div>
       </div>
-      <button onclick="saveSet()">Save Set</button>
+      <button onclick="saveSet()">Save Entry</button>
     </div>
 
     <div class="card">
-      <h2>History</h2>
+      <div class="filter-bar">
+        <h2 style="margin:0;">History & PBs</h2>
+        <select id="pbSortLog" style="width: auto; padding: 4px 8px; margin: 0; font-size: 0.8rem;" onchange="renderHistory()">
+          <option value="recent">Most Recent</option>
+          <option value="az">A to Z</option>
+        </select>
+      </div>
       <ul id="historyList"></ul>
     </div>
   </div>
 
+  <!-- BOTTOM NAVIGATION -->
   <nav class="bottom-nav">
     <button class="nav-btn active" onclick="switchTab('home')"><span class="nav-icon">✨</span><span>Home</span></button>
     <button class="nav-btn" onclick="switchTab('creator')"><span class="nav-icon">💪</span><span>Routines</span></button>
@@ -396,30 +422,49 @@
     /* ROUTINES & EXERCISE DRAFT */
     function addExerciseToDraft() {
       const name = document.getElementById("exTitle").value.trim();
-      if (!name) return alert("Enter exercise name.");
+      if (!name) return alert("Enter an exercise name.");
       draftExercises.push({
         name,
-        sets: document.getElementById("exSets").value,
-        reps: document.getElementById("exReps").value,
-        equip: document.getElementById("exEquip").value.trim()
+        sets: document.getElementById("exSets").value || '1',
+        reps: document.getElementById("exReps").value || '10',
+        equip: document.getElementById("exEquip").value.trim() || 'Bodyweight'
       });
       document.getElementById("exTitle").value = "";
       document.getElementById("exSets").value = "";
       document.getElementById("exReps").value = "";
       document.getElementById("exEquip").value = "";
-      document.getElementById("draftExerciseList").innerHTML = draftExercises.map(i => `<div><strong>${i.name}</strong> - ${i.sets||0}x${i.reps||0} (${i.equip||'None'})</div>`).join('');
+      document.getElementById("draftExerciseList").innerHTML = draftExercises.map(i => `<div><strong>${i.name}</strong> - ${i.sets}x${i.reps} (${i.equip})</div>`).join('');
     }
 
     function saveFullRoutine() {
       const name = document.getElementById("routineName").value.trim();
-      if (!name || !draftExercises.length) return alert("Name and 1 exercise required.");
+      const directExName = document.getElementById("exTitle").value.trim();
+
+      // If user typed an exercise directly in the inputs without clicking "+ Add Exercise to Draft"
+      if (directExName) {
+        draftExercises.push({
+          name: directExName,
+          sets: document.getElementById("exSets").value || '1',
+          reps: document.getElementById("exReps").value || '10',
+          equip: document.getElementById("exEquip").value.trim() || 'Bodyweight'
+        });
+      }
+
+      if (!name) return alert("Please enter a Routine Name.");
+      if (!draftExercises.length) return alert("Please add at least 1 exercise.");
+
       const tx = db.transaction("routines", "readwrite");
       tx.objectStore("routines").add({ name, items: draftExercises });
       tx.oncomplete = () => {
         document.getElementById("routineName").value = "";
+        document.getElementById("exTitle").value = "";
+        document.getElementById("exSets").value = "";
+        document.getElementById("exReps").value = "";
+        document.getElementById("exEquip").value = "";
         draftExercises = [];
         document.getElementById("draftExerciseList").innerHTML = "";
         refreshAllData();
+        alert("Routine saved successfully!");
       };
     }
 
@@ -536,9 +581,9 @@
 
     function addExerciseToActiveRoutine() {
       const name = document.getElementById("addExName").value.trim();
-      const sets = document.getElementById("addExSets").value;
-      const reps = document.getElementById("addExReps").value;
-      const equip = document.getElementById("addExEquip").value.trim();
+      const sets = document.getElementById("addExSets").value || '1';
+      const reps = document.getElementById("addExReps").value || '10';
+      const equip = document.getElementById("addExEquip").value.trim() || 'Bodyweight';
 
       if (!name) return alert("Please enter an exercise name.");
 
@@ -642,41 +687,70 @@
       };
     }
 
-    /* LOGS & PBS */
+    /* LOGS & PBS (WITH SAVING FIX & A-Z SORTING) */
     function saveSet() {
       const name = document.getElementById("logExName").value.trim();
-      const weight = parseFloat(document.getElementById("logWeight").value);
-      const reps = parseInt(document.getElementById("logReps").value);
-      if (!name || isNaN(weight) || isNaN(reps)) return alert("Fill in exercise, weight, reps.");
+      const weightVal = document.getElementById("logWeight").value;
+      const repsVal = document.getElementById("logReps").value;
+
+      const weight = weightVal !== "" ? parseFloat(weightVal) : 0;
+      const reps = repsVal !== "" ? parseInt(repsVal) : 0;
+
+      if (!name) return alert("Please enter an Exercise Name.");
+
       const tx = db.transaction("logs", "readwrite");
-      tx.objectStore("logs").add({ name, weight, reps, date: new Date().toLocaleDateString() });
-      tx.oncomplete = () => { document.getElementById("logWeight").value = ""; document.getElementById("logReps").value = ""; refreshAllData(); };
+      tx.objectStore("logs").add({ 
+        name, 
+        weight, 
+        reps, 
+        date: new Date().toLocaleDateString() 
+      });
+      
+      tx.oncomplete = () => { 
+        document.getElementById("logExName").value = ""; 
+        document.getElementById("logWeight").value = ""; 
+        document.getElementById("logReps").value = ""; 
+        refreshAllData(); 
+        alert("PB / Set Logged!");
+      };
     }
 
     function renderHistory() {
+      const sortMode = document.getElementById("pbSortLog") ? document.getElementById("pbSortLog").value : 'recent';
       const tx = db.transaction("logs", "readonly");
       tx.objectStore("logs").getAll().onsuccess = (e) => {
-        document.getElementById("historyList").innerHTML = e.target.result.reverse().map(i => `
+        let logs = e.target.result;
+        if (sortMode === 'az') {
+          logs.sort((a, b) => a.name.localeCompare(b.name));
+        } else {
+          logs.reverse();
+        }
+        document.getElementById("historyList").innerHTML = logs.map(i => `
           <li>
-            <span><strong>${i.name}</strong> (${i.date}): ${i.weight} x ${i.reps}</span>
+            <span><strong>${i.name}</strong> (${i.date}): ${i.weight} kg/lbs x ${i.reps} reps</span>
             <button class="del-btn" onclick="deleteLogEntry(${i.id})">Delete</button>
           </li>
-        `).join('');
+        `).join('') || "<p style='color:var(--muted);'>No entries logged yet.</p>";
       };
     }
 
     function renderHomePBs() {
+      const sortMode = document.getElementById("pbSortHome") ? document.getElementById("pbSortHome").value : 'recent';
       const tx = db.transaction("logs", "readonly");
       tx.objectStore("logs").getAll().onsuccess = (e) => {
         const pbs = {};
         e.target.result.forEach(i => { if (!pbs[i.name] || i.weight > pbs[i.name].weight) pbs[i.name] = i; });
+        let pbList = Object.values(pbs);
+        if (sortMode === 'az') {
+          pbList.sort((a, b) => a.name.localeCompare(b.name));
+        }
         const list = document.getElementById("homePbList");
-        list.innerHTML = Object.values(pbs).slice(0, 3).map(pb => `
+        list.innerHTML = pbList.slice(0, 5).map(pb => `
           <li>
             <span><strong>${pb.name}</strong> - ${pb.weight} kg/lbs</span>
             <button class="del-btn" onclick="deleteLogEntry(${pb.id})">Delete</button>
           </li>
-        `).join('') || "<p style='color:var(--muted);'>No PBs yet.</p>";
+        `).join('') || "<p style='color:var(--muted);'>No PBs recorded yet.</p>";
       };
     }
 
