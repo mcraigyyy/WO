@@ -208,20 +208,28 @@
       cursor: pointer;
     }
 
-    .progress-bar-bg {
-      width: 100%;
-      height: 12px;
-      background: rgba(0,0,0,0.4);
-      border-radius: 6px;
-      overflow: hidden;
-      margin-top: 8px;
-      border: 1px solid var(--glass-border);
+    /* GRID FOR SKETCH LAYOUT */
+    .weight-grid-top {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
     }
-    .progress-bar-fill {
-      height: 100%;
-      background: var(--gradient-accent);
-      width: 0%;
-      transition: width 0.3s ease;
+    .stat-box {
+      background: var(--glass-card);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-radius: 20px;
+      padding: 16px;
+      border: 1px solid var(--glass-border);
+      text-align: center;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+    .stat-value {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--accent-pink);
+      margin-top: 6px;
     }
   </style>
 </head>
@@ -269,31 +277,39 @@
     </div>
   </div>
 
-  <!-- WEIGHT HISTORY & GOAL PAGE -->
+  <!-- WEIGHT HISTORY & GOAL PAGE MATCHING SKETCH -->
   <div id="tab-weight-history" class="tab-content">
     <button class="secondary-btn" style="margin-bottom:15px; width:auto; padding:8px 16px;" onclick="switchTab('home')">← Back to Home</button>
     <h1>WEIGHT TRACKER</h1>
     
-    <div class="card">
-      <h2>Target Weight Goal</h2>
-      <div style="display: flex; gap: 8px; align-items: flex-end;">
-        <div style="flex: 1;">
-          <label style="margin-top:0;">Goal Weight (kg/lbs)</label>
-          <input type="number" id="goalWeightInput" step="0.1" placeholder="e.g. 65.0">
-        </div>
-        <button style="width: auto; margin-top:0; padding: 12px 18px;" onclick="saveGoalWeight()">Set Goal</button>
+    <!-- TOP LEFT (CURRENT) & TOP RIGHT (GOAL) BOXES -->
+    <div class="weight-grid-top">
+      <div class="stat-box">
+        <div class="date-subtitle">Current</div>
+        <div class="stat-value" id="dispCurrentWeight">--</div>
       </div>
-      <div id="goalProgressContainer" style="margin-top:15px; display:none;">
-        <div style="display:flex; justify-content:space-between; font-size:0.85rem;">
-          <span id="goalProgressText" style="color:var(--muted);">Progress</span>
-          <span id="goalTargetText" style="font-weight:bold; color:var(--accent-pink);">Goal: --</span>
-        </div>
-        <div class="progress-bar-bg">
-          <div class="progress-bar-fill" id="goalProgressBar"></div>
-        </div>
+      <div class="stat-box">
+        <div class="date-subtitle">Goal</div>
+        <div class="stat-value" id="dispGoalWeight">--</div>
       </div>
     </div>
 
+    <!-- ENTRY FORM BOX UNDERNEATH -->
+    <div class="card">
+      <h2 style="margin-bottom:4px;">Log Weight</h2>
+      <label>Weight (kg/lbs)</label>
+      <input type="number" id="customWeightInput" step="0.1" placeholder="Enter weight...">
+      
+      <label>Entry Type</label>
+      <select id="weightEntryType">
+        <option value="current">Current Weight</option>
+        <option value="goal">Goal Weight</option>
+      </select>
+
+      <button onclick="submitCustomWeight()">Save Entry</button>
+    </div>
+
+    <!-- HISTORY LINES UNDERNEATH -->
     <div class="card">
       <h2>Weight History</h2>
       <ul id="weightHistoryList"></ul>
@@ -492,7 +508,7 @@
       renderHomePBs(); renderTodayWorkout(); renderPBs(); renderRoutines(); renderSchedule(); renderActivityLog(); renderWeightTracker();
     }
 
-    /* WEIGHT TRACKING LOGIC */
+    /* WEIGHT TRACKING LOGIC (SKETCH IMPLEMENTATION) */
     function quickLogWeight() {
       const val = parseFloat(document.getElementById("quickWeightInput").value);
       if (isNaN(val) || val <= 0) return alert("Please enter a valid weight.");
@@ -507,12 +523,27 @@
       };
     }
 
-    function saveGoalWeight() {
-      const val = parseFloat(document.getElementById("goalWeightInput").value);
-      if (isNaN(val) || val <= 0) return alert("Please enter a valid goal weight.");
-      localStorage.setItem("user_goal_weight", val);
-      refreshAllData();
-      alert("Goal weight saved!");
+    function submitCustomWeight() {
+      const val = parseFloat(document.getElementById("customWeightInput").value);
+      const type = document.getElementById("weightEntryType").value;
+
+      if (isNaN(val) || val <= 0) return alert("Please enter a valid weight.");
+
+      if (type === "goal") {
+        localStorage.setItem("user_goal_weight", val);
+        document.getElementById("customWeightInput").value = "";
+        refreshAllData();
+        alert("Goal Weight Updated!");
+      } else {
+        const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const tx = db.transaction("weight_logs", "readwrite");
+        tx.objectStore("weight_logs").add({ weight: val, date: dateStr });
+        tx.oncomplete = () => {
+          document.getElementById("customWeightInput").value = "";
+          refreshAllData();
+          alert("Current Weight Logged!");
+        };
+      }
     }
 
     function renderWeightTracker() {
@@ -521,42 +552,27 @@
         const logs = e.target.result.reverse();
         const displayHome = document.getElementById("latestWeightDisplay");
         const listHistory = document.getElementById("weightHistoryList");
+        const dispCurrent = document.getElementById("dispCurrentWeight");
+        const dispGoal = document.getElementById("dispGoalWeight");
 
         if (logs.length > 0) {
           const latest = logs[0];
           displayHome.innerText = `Latest: ${latest.weight} kg/lbs (${latest.date})`;
+          dispCurrent.innerText = `${latest.weight}`;
         } else {
           displayHome.innerText = "No weight logged yet.";
+          dispCurrent.innerText = "--";
         }
+
+        const goalVal = localStorage.getItem("user_goal_weight");
+        dispGoal.innerText = goalVal ? `${goalVal}` : "--";
 
         listHistory.innerHTML = logs.map(w => `
           <li>
             <span><strong>${w.weight} kg/lbs</strong> <small style="color:var(--muted)">(${w.date})</small></span>
             <button class="del-btn" onclick="deleteWeightLog(${w.id})">Delete</button>
           </li>
-        `).join('') || "<p style='color:var(--muted); text-align:center;'>No weight entries logged yet.</p>";
-
-        // Goal Progress calculation
-        const goalVal = parseFloat(localStorage.getItem("user_goal_weight"));
-        const goalContainer = document.getElementById("goalProgressContainer");
-        if (!isNaN(goalVal) && logs.length > 0) {
-          goalContainer.style.display = "block";
-          document.getElementById("goalWeightInput").value = goalVal;
-          document.getElementById("goalTargetText").innerText = `Goal: ${goalVal} kg/lbs`;
-          
-          const currentVal = logs[0].weight;
-          const initialVal = logs[logs.length - 1].weight;
-          
-          let progressPercent = 100;
-          if (initialVal !== goalVal) {
-            progressPercent = Math.min(100, Math.max(0, ((initialVal - currentVal) / (initialVal - goalVal)) * 100));
-          }
-          
-          document.getElementById("goalProgressBar").style.width = `${progressPercent}%`;
-          document.getElementById("goalProgressText").innerText = `Current: ${currentVal} kg/lbs`;
-        } else if (!isNaN(goalVal)) {
-          document.getElementById("goalWeightInput").value = goalVal;
-        }
+        `).join('') || "<p style='color:var(--muted); text-align:center;'>No weight entries recorded yet.</p>";
       };
     }
 
