@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Workout Tracker</title>
+  
+  <link rel="apple-touch-icon" href="./icon-512.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Workout Tracker">
+  
+  <style>
+    :root {
+      --bg-gradient: linear-gradient(135deg, #120010 0%, #2a0826 40%, #1a0210 100%);
+      --accent-pink: #ff2a85;
+      --accent-orange: #ff7300;
+      --gradient-accent: linear-gradient(135deg, #ff2a85 0%, #ff7300 100%);
+      --glass-card: rgba(255, 255, 255, 0.07);
+      --glass-border: rgba(255, 255, 255, 0.12);
+      --text: #ffffff;
+      --muted: #d1b3ca;
+      --danger: #ff3b30;
+      --success: #34c759;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg-gradient);
+      background-attachment: fixed;
+      color: var(--text);
+      margin: 0;
+      min-height: 100vh;
+      padding: calc(40px + env(safe-area-inset-top)) 16px 90px 16px;
+      -webkit-user-select: none;
+    }
+    h1 {
+      text-align: center;
+      font-size: 1.8rem;
+      font-weight: 800;
+      background: var(--gradient-accent);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-top: 10px;
+      margin-bottom: 20px;
+    }
+    h2 { font-size: 1.2rem; margin-top: 0; margin-bottom: 12px; color: #fff; }
+    
+    .card {
+      background: var(--glass-card);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-radius: 20px;
+      padding: 20px;
+      margin-bottom: 16px;
+      border: 1px solid var(--glass-border);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+    
+    .date-subtitle {
+      font-size: 0.85rem;
+      color: var(--accent-orange);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+    
+    label { display: block; margin-top: 10px; color: var(--muted); font-size: 0.85rem; font-weight: 600; }
+    input, select {
+      width: 100%;
+      padding: 12px;
+      margin-top: 6px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      color: #fff;
+      font-size: 1rem;
+      outline: none;
+    }
+    
+    button {
+      width: 100%;
+      padding: 14px;
+      background: var(--gradient-accent);
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      font-weight: 700;
+      font-size: 1rem;
+      margin-top: 14px;
+      cursor: pointer;
+    }
+    .secondary-btn { background: rgba(255, 255, 255, 0.1); border: 1px solid var(--glass-border); }
+    .success-btn { background: var(--success); }
+    .del-btn {
+      background: none;
+      border: none;
+      color: var(--danger);
+      font-size: 0.85rem;
+      font-weight: bold;
+      padding: 4px 8px;
+      margin: 0;
+      width: auto;
+      box-shadow: none;
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .bottom-nav {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: 70px;
+      background: rgba(18, 0, 16, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-top: 1px solid var(--glass-border);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      padding-bottom: env(safe-area-inset-bottom);
+      z-index: 1000;
+    }
+    .nav-btn {
+      background: none; border: none; color: var(--muted);
+      font-size: 0.7rem; display: flex; flex-direction: column;
+      align-items: center; gap: 3px; padding: 0; margin: 0; width: auto;
+    }
+    .nav-btn.active { color: #fff; font-weight: bold; }
+    .nav-icon { font-size: 1.2rem; }
+
+    .timer-display { font-size: 3.5rem; font-weight: 800; text-align: center; margin: 15px 0; color: #fff; }
+    .timer-btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .timer-btn-grid button { margin-top: 0; }
+
+    ul { list-style: none; padding: 0; margin: 0; }
+    li {
+      padding: 12px 0;
+      border-bottom: 1px solid var(--glass-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    li:last-child { border-bottom: none; }
+
+    .checklist-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--glass-border);
+      background: transparent;
+    }
+    .circle-checkbox {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 24px;
+      height: 24px;
+      border: 2px solid var(--accent-pink);
+      border-radius: 50%;
+      outline: none;
+      cursor: pointer;
+      position: relative;
+    }
+    .circle-checkbox:checked { background: var(--accent-pink); }
+    .circle-checkbox:checked::after {
+      content: '✓';
+      position: absolute;
+      color: #fff;
+      font-size: 14px;
+      font-weight: bold;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    .checklist-item.done span, .checklist-item.done div { text-decoration: line-through; color: var(--muted); }
+    
+    .sort-btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .sort-btn {
+      background: rgba(255,255,255,0.1);
+      border: none;
+      color: #fff;
+      padding: 2px 6px;
+      font-size: 0.7rem;
+      border-radius: 4px;
+      margin: 0;
+      width: auto;
+    }
+
+    .routine-card-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--glass-border);
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="tab-home" class="tab-content active">
+    <h1>WORKOUT TRACKER</h1>
+    <div class="card">
+      <div class="date-subtitle" id="homeCurrentDate">Today</div>
+      <h2>Today's Workout</h2>
+      <div id="todayWorkoutDisplay">
+        <p style="text-align: center; color: var(--muted);">No workout scheduled for today.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Recent PBs</h2>
+      <ul id="homePbList"></ul>
+    </div>
+
+    <div class="card">
+      <h2>Routines</h2>
+      <button onclick="switchTab('creator')">Manage Routines</button>
+    </div>
+  </div>
+
+  <div id="tab-creator" class="tab-content">
+    <h1>ROUTINES</h1>
+    <div class="card">
+      <h2>Create New Routine</h2>
+      <label>Routine Name</label>
+      <input type="text" id="routineName" placeholder="e.g. Glutes & Legs">
+
+      <div style="display: flex; gap: 8px;">
+        <div style="flex: 2;">
+          <label>Exercise</label>
+          <input type="text" id="exTitle" placeholder="Hip Thrust">
+        </div>
+        <div style="flex: 1;">
+          <label>Sets</label>
+          <input type="number" id="exSets" placeholder="4">
+        </div>
+        <div style="flex: 1;">
+          <label>Reps</label>
+          <input type="number" id="exReps" placeholder="10">
+        </div>
+      </div>
+
+      <label>Equipment</label>
+      <input type="text" id="exEquip" placeholder="Barbell">
+
+      <button onclick="addExerciseToDraft()">+ Add Exercise</button>
+      <div id="draftExerciseList" style="margin-top: 15px;"></div>
+      <button class="secondary-btn" onclick="saveFullRoutine()">Save Routine</button>
+    </div>
+
+    <div class="card">
+      <h2>Saved Routines</h2>
+      <div id="routineContainer"></div>
+    </div>
+  </div>
+
+  <div id="tab-routine-detail" class="tab-content">
+    <button class="secondary-btn" style="margin-bottom:15px; width:auto; padding:8px 16px;" onclick="switchTab('creator')">← Back to Routines</button>
+    <h1 id="detailRoutineTitle">ROUTINE</h1>
+    
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <h2 style="margin:0;">Exercises</h2>
+        <button class="del-btn" id="detailDeleteRoutineBtn">Delete Routine</button>
+      </div>
+      <div id="detailExerciseList"></div>
+      <button class="success-btn" style="margin-top:15px;" onclick="finishActiveWorkout()">Finish Workout</button>
+    </div>
+
+    <div class="card">
+      <h2>Add Exercise to Routine</h2>
+      <label>Exercise Name</label>
+      <input type="text" id="addExName" placeholder="e.g. Cable Kickbacks">
+      
+      <div style="display: flex; gap: 8px;">
+        <div style="flex: 1;">
+          <label>Sets</label>
+          <input type="number" id="addExSets" placeholder="3">
+        </div>
+        <div style="flex: 1;">
+          <label>Reps</label>
+          <input type="number" id="addExReps" placeholder="12">
+        </div>
+      </div>
+
+      <label>Equipment</label>
+      <input type="text" id="addExEquip" placeholder="Cable Machine">
+
+      <button onclick="addExerciseToActiveRoutine()">Save Exercise to Routine</button>
+    </div>
+  </div>
+
+  <div id="tab-calendar" class="tab-content">
+    <h1>SCHEDULE</h1>
+    <div class="card">
+      <h2>Plan a Workout</h2>
+      <label>Date</label>
+      <input type="date" id="schedDate">
+      <label>Routine</label>
+      <select id="schedRoutine"></select>
+      <button onclick="scheduleWorkout()">Add to Schedule</button>
+    </div>
+
+    <div class="card">
+      <h2>Upcoming Sessions</h2>
+      <ul id="calendarList"></ul>
+    </div>
+  </div>
+
+  <div id="tab-timer" class="tab-content">
+    <h1>REST TIMER</h1>
+    <div class="card">
+      <div class="timer-display" id="timerDisplay">00:00</div>
+      <div class="timer-btn-grid">
+        <button onclick="startTimer(30)">+30s</button>
+        <button onclick="startTimer(60)">+60s</button>
+        <button onclick="startTimer(90)">+90s</button>
+        <button onclick="startTimer(120)">+120s</button>
+      </div>
+      <button class="secondary-btn" style="margin-top:12px;" onclick="resetTimer()">Reset</button>
+    </div>
+  </div>
+
+  <div id="tab-log" class="tab-content">
+    <h1>LOG WORKOUT</h1>
+    <div class="card">
+      <h2>Record Set</h2>
+      <label>Exercise</label>
+      <input type="text" id="logExName" placeholder="Hip Thrust">
+      <div style="display: flex; gap: 10px;">
+        <div style="flex: 1;">
+          <label>Weight</label>
+          <input type="number" id="logWeight" placeholder="80">
+        </div>
+        <div style="flex: 1;">
+          <label>Reps</label>
+          <input type="number" id="logReps" placeholder="10">
+        </div>
+      </div>
+      <button onclick="saveSet()">Save Set</button>
+    </div>
+
+    <div class="card">
+      <h2>History</h2>
+      <ul id="historyList"></ul>
+    </div>
+  </div>
+
+  <nav class="bottom-nav">
+    <button class="nav-btn active" onclick="switchTab('home')"><span class="nav-icon">✨</span><span>Home</span></button>
+    <button class="nav-btn" onclick="switchTab('creator')"><span class="nav-icon">💪</span><span>Routines</span></button>
+    <button class="nav-btn" onclick="switchTab('calendar')"><span class="nav-icon">📅</span><span>Calendar</span></button>
+    <button class="nav-btn" onclick="switchTab('timer')"><span class="nav-icon">⏱️</span><span>Timer</span></button>
+    <button class="nav-btn" onclick="switchTab('log')"><span class="nav-icon">📝</span><span>Log</span></button>
+  </nav>
+
+  <script>
+    let db, draftExercises = [], currentActiveRoutineId = null;
+    const dbReq = indexedDB.open("WorkoutTrackerDB", 4);
+
+    dbReq.onupgradeneeded = (e) => {
+      db = e.target.result;
+      if (!db.objectStoreNames.contains("logs")) db.createObjectStore("logs", { keyPath: "id", autoIncrement: true });
+      if (!db.objectStoreNames.contains("routines")) db.createObjectStore("routines", { keyPath: "id", autoIncrement: true });
+      if (!db.objectStoreNames.contains("schedule")) db.createObjectStore("schedule", { keyPath: "id", autoIncrement: true });
+    };
+
+    dbReq.onsuccess = (e) => {
+      db = e.target.result;
+      document.getElementById("homeCurrentDate").innerText = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+      refreshAllData();
+    };
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+      
+      const target = document.getElementById(`tab-${tabId}`);
+      if (target) target.classList.add('active');
+
+      const idx = ['home', 'creator', 'calendar', 'timer', 'log'].indexOf(tabId);
+      if (idx !== -1) document.querySelectorAll('.nav-btn')[idx].classList.add('active');
+    }
+
+    function refreshAllData() {
+      renderHomePBs(); renderTodayWorkout(); renderHistory(); renderRoutines(); renderSchedule();
+    }
+
+    /* ROUTINES & EXERCISE DRAFT */
+    function addExerciseToDraft() {
+      const name = document.getElementById("exTitle").value.trim();
+      if (!name) return alert("Enter exercise name.");
+      draftExercises.push({
+        name,
+        sets: document.getElementById("exSets").value,
+        reps: document.getElementById("exReps").value,
+        equip: document.getElementById("exEquip").value.trim()
+      });
+      document.getElementById("exTitle").value = "";
+      document.getElementById("exSets").value = "";
+      document.getElementById("exReps").value = "";
+      document.getElementById("exEquip").value = "";
+      document.getElementById("draftExerciseList").innerHTML = draftExercises.map(i => `<div><strong>${i.name}</strong> - ${i.sets||0}x${i.reps||0} (${i.equip||'None'})</div>`).join('');
+    }
+
+    function saveFullRoutine() {
+      const name = document.getElementById("routineName").value.trim();
+      if (!name || !draftExercises.length) return alert("Name and 1 exercise required.");
+      const tx = db.transaction("routines", "readwrite");
+      tx.objectStore("routines").add({ name, items: draftExercises });
+      tx.oncomplete = () => {
+        document.getElementById("routineName").value = "";
+        draftExercises = [];
+        document.getElementById("draftExerciseList").innerHTML = "";
+        refreshAllData();
+      };
+    }
+
+    function renderRoutines() {
+      const tx = db.transaction("routines", "readonly");
+      tx.objectStore("routines").getAll().onsuccess = (e) => {
+        const routines = e.target.result;
+        const container = document.getElementById("routineContainer");
+        const select = document.getElementById("schedRoutine");
+        container.innerHTML = ""; select.innerHTML = "";
+        
+        routines.forEach(rt => {
+          const opt = document.createElement("option"); opt.value = rt.name; opt.textContent = rt.name; select.appendChild(opt);
+          
+          const item = document.createElement("div");
+          item.className = "routine-card-item";
+          item.onclick = () => openRoutineDetailPage(rt.id);
+          item.innerHTML = `
+            <div>
+              <strong style="color:var(--accent-pink); font-size:1.1rem;">${rt.name}</strong><br>
+              <small style="color:var(--muted)">${(rt.items || []).length} exercises</small>
+            </div>
+            <span style="color:var(--accent-pink); font-size:1.2rem;">→</span>
+          `;
+          container.appendChild(item);
+        });
+      };
+    }
+
+    /* ROUTINE DETAIL PAGE WITH SORTING & CHECKBOX PERSISTENCE */
+    function openRoutineDetailPage(id) {
+      currentActiveRoutineId = id;
+      const tx = db.transaction("routines", "readonly");
+      tx.objectStore("routines").get(id).onsuccess = (e) => {
+        const rt = e.target.result;
+        if (!rt) return;
+
+        document.getElementById("detailRoutineTitle").innerText = rt.name.toUpperCase();
+        document.getElementById("detailDeleteRoutineBtn").onclick = () => deleteRoutine(rt.id);
+        
+        const list = document.getElementById("detailExerciseList");
+        if (rt.items && rt.items.length) {
+          list.innerHTML = rt.items.map((ex, idx) => {
+            const isChecked = localStorage.getItem(`rt_${id}_ex_${idx}`) === 'true';
+            return `
+              <div class="checklist-item ${isChecked ? 'done' : ''}">
+                <div class="sort-btn-group">
+                  <button class="sort-btn" onclick="moveExercise(${rt.id}, ${idx}, -1)">▲</button>
+                  <button class="sort-btn" onclick="moveExercise(${rt.id}, ${idx}, 1)">▼</button>
+                </div>
+                <input type="checkbox" class="circle-checkbox" ${isChecked ? 'checked' : ''} onclick="toggleCheckState(${id}, ${idx}, this)">
+                <div style="flex:1;">
+                  <strong>${ex.name}</strong> 
+                  <button class="del-btn" style="padding:0 4px; font-size:0.75rem;" onclick="showHistoryPopup('${ex.name}')">🔍 History</button><br>
+                  <small style="color:var(--muted)">${ex.sets||'-'} sets x ${ex.reps||'-'} reps • ${ex.equip||'Bodyweight'}</small>
+                </div>
+                <button class="del-btn" onclick="deleteExerciseFromRoutine(${rt.id}, ${idx})">✕</button>
+              </div>
+            `;
+          }).join('');
+        } else {
+          list.innerHTML = '<p style="color:var(--muted); text-align:center;">No exercises in this routine yet.</p>';
+        }
+
+        switchTab('routine-detail');
+      };
+    }
+
+    function toggleCheckState(rtId, exIdx, checkbox) {
+      localStorage.setItem(`rt_${rtId}_ex_${exIdx}`, checkbox.checked);
+      checkbox.parentElement.classList.toggle('done', checkbox.checked);
+    }
+
+    function finishActiveWorkout() {
+      if (!currentActiveRoutineId) return;
+      const keys = Object.keys(localStorage);
+      keys.forEach(k => {
+        if (k.startsWith(`rt_${currentActiveRoutineId}_ex_`)) {
+          localStorage.removeItem(k);
+        }
+      });
+      alert("Workout completed and progress reset!");
+      openRoutineDetailPage(currentActiveRoutineId);
+    }
+
+    function moveExercise(rtId, idx, direction) {
+      const tx = db.transaction("routines", "readwrite");
+      const store = tx.objectStore("routines");
+      store.get(rtId).onsuccess = (e) => {
+        const rt = e.target.result;
+        const newIdx = idx + direction;
+        if (newIdx >= 0 && newIdx < rt.items.length) {
+          const temp = rt.items[idx];
+          rt.items[idx] = rt.items[newIdx];
+          rt.items[newIdx] = temp;
+          store.put(rt);
+        }
+      };
+      tx.oncomplete = () => openRoutineDetailPage(rtId);
+    }
+
+    function showHistoryPopup(exName) {
+      const tx = db.transaction("logs", "readonly");
+      tx.objectStore("logs").getAll().onsuccess = (e) => {
+        const logs = e.target.result.filter(l => l.name.toLowerCase() === exName.toLowerCase()).reverse();
+        if (logs.length) {
+          const top = logs[0];
+          alert(`Last Logged for ${exName}:\nWeight: ${top.weight} kg/lbs\nReps: ${top.reps}\nDate: ${top.date}`);
+        } else {
+          alert(`No previous history logged for "${exName}".`);
+        }
+      };
+    }
+
+    function addExerciseToActiveRoutine() {
+      const name = document.getElementById("addExName").value.trim();
+      const sets = document.getElementById("addExSets").value;
+      const reps = document.getElementById("addExReps").value;
+      const equip = document.getElementById("addExEquip").value.trim();
+
+      if (!name) return alert("Please enter an exercise name.");
+
+      const tx = db.transaction("routines", "readwrite");
+      const store = tx.objectStore("routines");
+      store.get(currentActiveRoutineId).onsuccess = (e) => {
+        const rt = e.target.result;
+        if (!rt.items) rt.items = [];
+        rt.items.push({ name, sets, reps, equip });
+        store.put(rt);
+      };
+
+      tx.oncomplete = () => {
+        document.getElementById("addExName").value = "";
+        document.getElementById("addExSets").value = "";
+        document.getElementById("addExReps").value = "";
+        document.getElementById("addExEquip").value = "";
+        openRoutineDetailPage(currentActiveRoutineId);
+        refreshAllData();
+      };
+    }
+
+    function deleteRoutine(id) {
+      if (!confirm("Are you sure you want to delete this routine?")) return;
+      const tx = db.transaction("routines", "readwrite");
+      tx.objectStore("routines").delete(id);
+      tx.oncomplete = () => {
+        switchTab('creator');
+        refreshAllData();
+      };
+    }
+
+    function deleteExerciseFromRoutine(rtId, exIdx) {
+      const tx = db.transaction("routines", "readwrite");
+      const store = tx.objectStore("routines");
+      store.get(rtId).onsuccess = (e) => {
+        const rt = e.target.result;
+        rt.items.splice(exIdx, 1);
+        store.put(rt);
+      };
+      tx.oncomplete = () => openRoutineDetailPage(rtId);
+    }
+
+    /* SCHEDULE */
+    function scheduleWorkout() {
+      const date = document.getElementById("schedDate").value, routine = document.getElementById("schedRoutine").value;
+      if (!date || !routine) return alert("Select date and routine.");
+      const tx = db.transaction("schedule", "readwrite");
+      tx.objectStore("schedule").add({ date, routine });
+      tx.oncomplete = () => refreshAllData();
+    }
+
+    function renderSchedule() {
+      const tx = db.transaction("schedule", "readonly");
+      tx.objectStore("schedule").getAll().onsuccess = (e) => {
+        document.getElementById("calendarList").innerHTML = e.target.result.map(i => `
+          <li>
+            <span>${i.date} - <strong>${i.routine}</strong></span>
+            <button class="del-btn" onclick="deleteScheduledSession(${i.id})">Delete</button>
+          </li>
+        `).join('');
+      };
+    }
+
+    function deleteScheduledSession(id) {
+      const tx = db.transaction("schedule", "readwrite");
+      tx.objectStore("schedule").delete(id);
+      tx.oncomplete = () => refreshAllData();
+    }
+
+    /* HOME SCREEN & TODAY'S WORKOUT */
+    function renderTodayWorkout() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const today = `${year}-${month}-${day}`;
+
+      const tx = db.transaction("schedule", "readonly");
+      tx.objectStore("schedule").getAll().onsuccess = (e) => {
+        const match = e.target.result.find(i => i.date === today);
+        const display = document.getElementById("todayWorkoutDisplay");
+        
+        if (match) {
+          tx.db.transaction("routines", "readonly").objectStore("routines").getAll().onsuccess = (ev) => {
+            const rtMatch = ev.target.result.find(r => r.name === match.routine);
+            if (rtMatch) {
+              display.innerHTML = `
+                <div style="cursor:pointer;" onclick="openRoutineDetailPage(${rtMatch.id})">
+                  <h3 style="color: var(--accent-pink); margin:0 0 8px 0; text-align:center;">${match.routine} (Tap to Open)</h3>
+                  <p style="text-align:center; color:var(--muted); margin:0; font-size:0.85rem;">Click to view exercises and check off your sets.</p>
+                </div>
+              `;
+            } else {
+              display.innerHTML = `<h3 style="color: var(--accent-pink); margin:0; text-align:center;">${match.routine}</h3>`;
+            }
+          };
+        } else {
+          display.innerHTML = `<p style="text-align: center; color: var(--muted);">No workout scheduled for today.</p>`;
+        }
+      };
+    }
+
+    /* LOGS & PBS */
+    function saveSet() {
+      const name = document.getElementById("logExName").value.trim();
+      const weight = parseFloat(document.getElementById("logWeight").value);
+      const reps = parseInt(document.getElementById("logReps").value);
+      if (!name || isNaN(weight) || isNaN(reps)) return alert("Fill in exercise, weight, reps.");
+      const tx = db.transaction("logs", "readwrite");
+      tx.objectStore("logs").add({ name, weight, reps, date: new Date().toLocaleDateString() });
+      tx.oncomplete = () => { document.getElementById("logWeight").value = ""; document.getElementById("logReps").value = ""; refreshAllData(); };
+    }
+
+    function renderHistory() {
+      const tx = db.transaction("logs", "readonly");
+      tx.objectStore("logs").getAll().onsuccess = (e) => {
+        document.getElementById("historyList").innerHTML = e.target.result.reverse().map(i => `
+          <li>
+            <span><strong>${i.name}</strong> (${i.date}): ${i.weight} x ${i.reps}</span>
+            <button class="del-btn" onclick="deleteLogEntry(${i.id})">Delete</button>
+          </li>
+        `).join('');
+      };
+    }
+
+    function renderHomePBs() {
+      const tx = db.transaction("logs", "readonly");
+      tx.objectStore("logs").getAll().onsuccess = (e) => {
+        const pbs = {};
+        e.target.result.forEach(i => { if (!pbs[i.name] || i.weight > pbs[i.name].weight) pbs[i.name] = i; });
+        const list = document.getElementById("homePbList");
+        list.innerHTML = Object.values(pbs).slice(0, 3).map(pb => `
+          <li>
+            <span><strong>${pb.name}</strong> - ${pb.weight} kg/lbs</span>
+            <button class="del-btn" onclick="deleteLogEntry(${pb.id})">Delete</button>
+          </li>
+        `).join('') || "<p style='color:var(--muted);'>No PBs yet.</p>";
+      };
+    }
+
+    function deleteLogEntry(id) {
+      const tx = db.transaction("logs", "readwrite");
+      tx.objectStore("logs").delete(id);
+      tx.oncomplete = () => refreshAllData();
+    }
+
+    /* REST TIMER WITH DOUBLE BEEP */
+    let timerInterval, timeLeft = 0;
+    let audioCtx = null;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function startTimer(sec) {
+      initAudio();
+      clearInterval(timerInterval);
+      timeLeft = sec;
+      updateDisplay();
+      
+      timerInterval = setInterval(() => {
+        timeLeft--;
+        updateDisplay();
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+          playDoubleBeep();
+          if ('vibrate' in navigator) navigator.vibrate([200, 100, 200]);
+        }
+      }, 1000);
+    }
+
+    function resetTimer() { 
+      clearInterval(timerInterval); 
+      timeLeft = 0; 
+      updateDisplay(); 
+    }
+
+    function updateDisplay() {
+      const m = Math.floor(timeLeft / 60), s = timeLeft % 60;
+      document.getElementById("timerDisplay").innerText = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    }
+
+    function playDoubleBeep() {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        const osc1 = audioCtx.createOscillator();
+        const gain1 = audioCtx.createGain();
+        osc1.type = "sine";
+        osc1.frequency.setValueAtTime(880, audioCtx.currentTime);
+        gain1.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        osc1.connect(gain1);
+        gain1.connect(audioCtx.destination);
+        osc1.start(audioCtx.currentTime);
+        osc1.stop(audioCtx.currentTime + 0.15);
+
+        const osc2 = audioCtx.createOscillator();
+        const gain2 = audioCtx.createGain();
+        osc2.type = "sine";
+        osc2.frequency.setValueAtTime(880, audioCtx.currentTime + 0.25);
+        gain2.gain.setValueAtTime(0.2, audioCtx.currentTime + 0.25);
+        osc2.connect(gain2);
+        gain2.connect(audioCtx.destination);
+        osc2.start(audioCtx.currentTime + 0.25);
+        osc2.stop(audioCtx.currentTime + 0.40);
+      } catch (e) {
+        console.log("Audio play error:", e);
+      }
+    }
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js?v=' + Date.now()).then((reg) => {
+        reg.update();
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              window.location.reload();
+            }
+          });
+        });
+      });
+    }
+  </script>
+</body>
+</html>
